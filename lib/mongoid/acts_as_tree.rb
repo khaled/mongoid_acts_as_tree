@@ -31,9 +31,10 @@ module Mongoid
 					field parent_id_field, :type => BSON::ObjectId
 					field path_field, :type => Array,  :default => []
 					field depth_field, :type => Integer, :default => 0
-					
-					index parent_id_field
-					index path_field
+				
+				  # These indexes are recommended to add to Classes using this
+					# index parent_id_field
+					# index path_field
 
 					self.class_eval do
 						define_method "#{parent_id_field}=" do | new_parent_id |
