@@ -6,16 +6,14 @@ $LOAD_PATH.unshift(File.join(File.dirname(__FILE__), '..', 'lib'))
 $LOAD_PATH.unshift(File.dirname(__FILE__))
 require 'mongoid'
 
-Mongoid.configure.master = Mongo::Connection.new.db('acts_as_tree-test')
+Mongoid.load!(File.join(File.dirname(__FILE__), "mongoid.yml"), :test)
 
 Dir["#{File.dirname(__FILE__)}/models/*.rb"].each {|file| require file}
 
 class Test::Unit::TestCase
   # Drop all columns after each test case.
-    def teardown
-    Mongoid.database.collections.each do |coll|
-      coll.remove
-    end
+  def teardown
+    Mongoid.default_session.collections.each(&:drop)
   end
 
   # Make sure that each test case has a teardown

@@ -28,10 +28,10 @@ module Mongoid
 					extend Fields
 					extend ClassMethods
 
-					field parent_id_field, :type => BSON::ObjectId
+					field parent_id_field, :type => Moped::BSON::ObjectId
 					field path_field, :type => Array,  :default => []
 					field depth_field, :type => Integer, :default => 0
-				
+
 				  # These indexes are recommended to add to Classes using this
 					# index parent_id_field
 					# index path_field
@@ -49,14 +49,14 @@ module Mongoid
 						  end
 						end
 					end
-					
+
 					before_validation :set_position_information, :if => lambda { |obj|
 						# TODO: Not a fan of this, but mongoid does not seem to be correctly honoring :on => :create/:update
 						(obj.new_record? && obj[self.parent_id_field].present?) or (!obj.new_record? && obj["#{self.parent_id_field}_changed?".to_sym])
 					}
 					#before_validation	:set_position_information#, :on => :create, :unless => lambda { |obj| obj[self.parent_id_field].blank? }
 					#before_validation	:set_position_information, :on => :update, :if => lambda { |obj| obj["#{self.parent_id_field}_changed?".to_sym] }
-					
+
 					validate					:will_save_tree
 					after_save				:move_children
 					before_destroy		:destroy_descendants
@@ -93,7 +93,7 @@ module Mongoid
 				def parent
 					@_parent or (self[parent_id_field].nil? ? nil : parent_cursor.one)
 				end
-				
+
 				def parent=(new_parent)
 					self.send("#{parent_id_field}=".to_sym, new_parent.id)
 				end
@@ -101,7 +101,7 @@ module Mongoid
 				def root?
 					self[parent_id_field].nil?
 				end
-				
+
 				def root_id
 					self[path_field].first
 				end
@@ -112,7 +112,7 @@ module Mongoid
 
 				def ancestors
 					return [] if root?
-					acts_as_tree_options[:class].where(:_id.in => self[path_field]).order_by(depth_field)
+					acts_as_tree_options[:class].where(:_id.in => self[path_field]).order_by("#{depth_field} ASC")
 				end
 
 				def self_and_ancestors
@@ -184,7 +184,7 @@ module Mongoid
 				def destroy_descendants
 					self.descendants.each(&:destroy)
 				end
-				
+
 				def set_position_information
 					if parent.present? && parent.already_exists_in_tree?(self)
 						self.instance_variable_set :@_cyclic, true
@@ -192,40 +192,40 @@ module Mongoid
 						self.update_position_information
 					end
 				end
-				
+
 				def update_position_information
 					@_will_move = true
 					parent.nil? ? self.clear_parent_information : self.set_parent_information
 				end
-				
+
 				def clear_parent_information
 					self.write_attribute parent_id_field, nil
 					self[path_field] = []
 					self[depth_field] = 0
 				end
-				
+
 				def clear_parent_information!
 					self.clear_parent_information
 					self.save
 				end
-				
+
 				def set_parent_information(parent=self.parent)
 					self.write_attribute parent_id_field, parent._id
 					self[path_field] = parent[path_field] + [parent._id]
 					self[depth_field] = parent[depth_field] + 1
 				end
-				
+
 				def already_exists_in_tree?(root)
-					tree_ids = root.class.collection.find({ root.path_field => root.id }, { :fields => { "_id" => 1 } }).collect(&:id) + [ root.id ]
+					tree_ids = root.class.collection.find(root.path_field => root.id).select(_id: 1).map { |x| x['_id'] } + [ root.id ]
 					tree_ids.include?(self.id)
 				end
-				
+
 			private
-			
+
 				def parent_cursor(parent_id=self[parent_id_field])
 					acts_as_tree_options[:class].where(:_id => parent_id)
 				end
-				
+
 			end
 
 		end
